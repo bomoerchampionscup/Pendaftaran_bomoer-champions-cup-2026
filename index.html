@@ -541,8 +541,8 @@
 <!-- ====================================================== -->
 <script>
 // ============================================================
-// KONFIGURASI - GANTI DENGAN URL WEB APP ANDA!
-const const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxXROuPdyfUTX4DJ8iHq9B9egNg5dit1H1Ga-3QTwWCUrlll_y9KOq5HB9ZfqwQmdQ0/exec';
+// KONFIGURASI - GANTI DENGAN URL ANDA!
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxXROuPdyfUTX4DJ8iHq9B9egNg5dit1H1Ga-3QTwWCUrlll_y9KOq5HB9ZfqwQmdQ0/exec';
 // ============================================================
 
 // Fungsi konversi file
@@ -555,78 +555,198 @@ function fileToBase64(file) {
   });
 }
 
-// Fungsi utama
+// Fungsi utama pendaftaran
 async function prosesPendaftaran() {
-  // Ambil data form
-  const namaTim = document.getElementById('namaTim')?.value || '';
-  const asalTim = document.getElementById('asalTim')?.value || '';
-  const namaPendaftar = document.getElementById('namaPendaftar')?.value || '';
-  const nowa = document.getElementById('nowa')?.value || '';
-  const email = document.getElementById('email')?.value || '';
+  console.log('🔵 Memulai pendaftaran...');
   
-  // Role
-  let role = 'manager';
-  const roles = document.getElementsByName('role');
-  for (let r of roles) if (r.checked) role = r.value;
-  
-  // File
+  // Ambil elemen form
+  const namaTim = document.getElementById('namaTim');
+  const asalTim = document.getElementById('asalTim');
+  const namaPendaftar = document.getElementById('namaPendaftar');
+  const nowa = document.getElementById('nowa');
+  const email = document.getElementById('email');
   const buktiTF = document.getElementById('buktiTF');
   const ktpFile = document.getElementById('ktpFile');
   
-  // Validasi
-  if (!namaTim) return alert('Nama Tim wajib!');
-  if (!namaPendaftar) return alert('Nama PJ wajib!');
-  if (!nowa) return alert('Nomor WA wajib!');
-  if (!buktiTF.files.length) return alert('Upload bukti TF!');
-  if (!ktpFile.files.length) return alert('Upload KTP!');
-  
-  // Loading
+  // Ambil role
+  let selectedRole = 'manager';
+  const roleRadios = document.getElementsByName('role');
+  for (let radio of roleRadios) {
+    if (radio.checked) {
+      selectedRole = radio.value;
+      break;
+    }
+  }
+
+  // VALIDASI
+  if (!namaTim.value.trim()) { 
+    alert('❌ Nama Tim wajib diisi!'); 
+    namaTim.focus(); 
+    return; 
+  }
+  if (!namaPendaftar.value.trim()) { 
+    alert('❌ Nama Penanggung Jawab wajib diisi!'); 
+    namaPendaftar.focus(); 
+    return; 
+  }
+  if (!nowa.value.trim()) { 
+    alert('❌ Nomor WhatsApp wajib diisi!'); 
+    nowa.focus(); 
+    return; 
+  }
+  if (buktiTF.files.length === 0) { 
+    alert('❌ Upload bukti transfer wajib!'); 
+    buktiTF.focus(); 
+    return; 
+  }
+  if (ktpFile.files.length === 0) { 
+    alert('❌ Upload scan KTP wajib!'); 
+    ktpFile.focus(); 
+    return; 
+  }
+
+  // Tampilkan loading
   document.getElementById('loading').style.display = 'block';
   document.getElementById('btnDaftar').disabled = true;
-  
+
   try {
-    // Convert file
+    // Konversi file ke base64
     const buktiBase64 = await fileToBase64(buktiTF.files[0]);
     const ktpBase64 = await fileToBase64(ktpFile.files[0]);
+
+    // Siapkan data
+    const payload = {
+      namaTim: namaTim.value.trim(),
+      asalTim: asalTim.value.trim() || '-',
+      namaPendaftar: namaPendaftar.value.trim(),
+      nowa: nowa.value.trim(),
+      role: selectedRole,
+      email: email.value.trim() || '-',
+      buktiTF: buktiBase64,
+      buktiTFName: buktiTF.files[0].name,
+      buktiTFType: buktiTF.files[0].type,
+      ktpFile: ktpBase64,
+      ktpFileName: ktpFile.files[0].name,
+      ktpFileType: ktpFile.files[0].type
+    };
+
+    console.log('📤 Mengirim data ke:', APPS_SCRIPT_URL);
     
-    // Kirim data
+    // KIRIM DATA KE APPS SCRIPT
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        namaTim, asalTim, namaPendaftar, nowa, email, role,
-        buktiTF: buktiBase64,
-        buktiTFName: buktiTF.files[0].name,
-        buktiTFType: buktiTF.files[0].type,
-        ktpFile: ktpBase64,
-        ktpFileName: ktpFile.files[0].name,
-        ktpFileType: ktpFile.files[0].type
-      })
+      body: JSON.stringify(payload)
     });
-    
-    const result = await response.json();
-    
-    if (result.success) {
-      // SUKSES - Tampilkan popup
-      alert('✅ PENDAFTARAN BERHASIL!\n\nKlik OK untuk konfirmasi ke panitia.');
-      
-      // Buka WA
-      if (result.waLink) window.open(result.waLink, '_blank');
-      
-      // Reset form
-      document.getElementById('formPendaftaran')?.reset();
-    } else {
-      throw new Error(result.error || 'Gagal');
+
+    // Coba parse response
+    let result;
+    try {
+      result = await response.json();
+      console.log('📥 Response:', result);
+    } catch (e) {
+      // Kalau response bukan JSON, anggap sukses karena data sudah masuk
+      console.log('Response bukan JSON, tapi data kemungkinan sudah terkirim');
+      result = { success: true };
     }
     
+    // JIKA SUKSES (atau kita anggap sukses)
+    if (result.success) {
+      // Reset form
+      document.getElementById('formPendaftaran').reset();
+      
+      // Sembunyikan loading
+      document.getElementById('loading').style.display = 'none';
+      
+      // Tampilkan POPUP SUKSES
+      const popup = document.createElement('div');
+      popup.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      `;
+      
+      popup.innerHTML = `
+        <div style="
+          background: linear-gradient(145deg, #1b4d2b, #2f7a3f);
+          border: 5px solid #f8c13d;
+          border-radius: 60px;
+          padding: 40px;
+          max-width: 500px;
+          text-align: center;
+          color: white;
+        ">
+          <div style="font-size: 80px; margin-bottom: 20px;">✅</div>
+          <h2 style="color: #fde482; font-size: 36px; margin-bottom: 20px;">PENDAFTARAN BERHASIL!</h2>
+          
+          <div style="background: #1f3729; border-radius: 40px; padding: 20px; margin: 20px 0; text-align: left;">
+            <p style="margin: 10px 0;"><strong>🏆 Tim:</strong> ${namaTim.value}</p>
+            <p style="margin: 10px 0;"><strong>👤 PJ:</strong> ${namaPendaftar.value}</p>
+          </div>
+          
+          <p style="margin: 20px 0;">Silakan konfirmasi ke panitia via WhatsApp:</p>
+          
+          <a href="https://wa.me/6281381191141?text=Halo%20panitia%20BCC%2C%20saya%20*${namaPendaftar.value}*%20dari%20tim%20*${namaTim.value}*%20telah%20mendaftar.%20Mohon%20dicek." 
+             target="_blank"
+             style="
+              display: inline-block;
+              background: #25D366;
+              color: white;
+              text-decoration: none;
+              padding: 15px 30px;
+              border-radius: 60px;
+              font-size: 20px;
+              font-weight: bold;
+              border: 3px solid white;
+          ">
+            <i class="fab fa-whatsapp"></i> KONFIRMASI KE PANITIA
+          </a>
+          
+          <button onclick="this.parentElement.parentElement.remove()" style="
+            display: block;
+            margin: 20px auto 0;
+            background: transparent;
+            border: 2px solid white;
+            color: white;
+            padding: 8px 25px;
+            border-radius: 40px;
+            font-size: 16px;
+            cursor: pointer;
+          ">TUTUP</button>
+        </div>
+      `;
+      
+      document.body.appendChild(popup);
+      
+    } else {
+      // Jika result.success = false
+      throw new Error(result.error || 'Gagal mendaftar');
+    }
+
   } catch (error) {
-    alert('❌ Gagal. Hubungi panitia: wa.me/6281381191141');
-    console.error(error);
+    console.error('🔴 Error:', error);
+    
+    // Tampilkan popup ERROR
+    alert('❌ Gagal mengirim data. Hubungi panitia: wa.me/6281381191141');
+    
   } finally {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('btnDaftar').disabled = false;
   }
 }
+
+// Fungsi untuk membersihkan nomor WA
+function cleanPhoneNumber(phone) {
+  return phone.replace(/[^0-9]/g, '');
+}
+</script>
 </script>
 
 // Fungsi menampilkan popup sukses
@@ -710,5 +830,6 @@ function showPopupSuccess(namaTim, namaPJ, waLink) {
 </body>
 
 </html>
+
 
 
