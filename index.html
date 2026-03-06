@@ -542,10 +542,10 @@
 <script>
 // ============================================================
 // KONFIGURASI - GANTI DENGAN URL WEB APP ANDA!
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYo8-uRwvXXgEOkYfZPBySRZrfvhR7PPRn0n7R2uMh7haeXOpNaBRvT-d6hOVupgOr/exec'; // GANTI!
+const const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz5uERzNLEWoPU0JAlwggcTzdB60VsZeM2Qk7w_z9FB6IV4IXMGbmXr3ITOYvHfWTGG/exec';
 // ============================================================
 
-// Fungsi konversi file ke base64
+// Fungsi konversi file
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -555,113 +555,79 @@ function fileToBase64(file) {
   });
 }
 
-// Fungsi utama pendaftaran
+// Fungsi utama
 async function prosesPendaftaran() {
-  console.log('🔵 Memproses pendaftaran...');
+  // Ambil data form
+  const namaTim = document.getElementById('namaTim')?.value || '';
+  const asalTim = document.getElementById('asalTim')?.value || '';
+  const namaPendaftar = document.getElementById('namaPendaftar')?.value || '';
+  const nowa = document.getElementById('nowa')?.value || '';
+  const email = document.getElementById('email')?.value || '';
   
-  // Ambil elemen form
-  const namaTim = document.getElementById('namaTim');
-  const asalTim = document.getElementById('asalTim');
-  const namaPendaftar = document.getElementById('namaPendaftar');
-  const nowa = document.getElementById('nowa');
-  const email = document.getElementById('email');
+  // Role
+  let role = 'manager';
+  const roles = document.getElementsByName('role');
+  for (let r of roles) if (r.checked) role = r.value;
+  
+  // File
   const buktiTF = document.getElementById('buktiTF');
   const ktpFile = document.getElementById('ktpFile');
   
-  // Ambil role
-  let selectedRole = 'manager';
-  const roleRadios = document.getElementsByName('role');
-  for (let radio of roleRadios) {
-    if (radio.checked) {
-      selectedRole = radio.value;
-      break;
-    }
-  }
-
-  // VALIDASI
-  if (!namaTim.value.trim()) { 
-    alert('❌ Nama Tim wajib diisi!'); 
-    namaTim.focus(); 
-    return; 
-  }
-  if (!namaPendaftar.value.trim()) { 
-    alert('❌ Nama Penanggung Jawab wajib diisi!'); 
-    namaPendaftar.focus(); 
-    return; 
-  }
-  if (!nowa.value.trim()) { 
-    alert('❌ Nomor WhatsApp wajib diisi!'); 
-    nowa.focus(); 
-    return; 
-  }
-  if (buktiTF.files.length === 0) { 
-    alert('❌ Upload bukti transfer wajib!'); 
-    buktiTF.focus(); 
-    return; 
-  }
-  if (ktpFile.files.length === 0) { 
-    alert('❌ Upload scan KTP wajib!'); 
-    ktpFile.focus(); 
-    return; 
-  }
-
-  // Tampilkan loading
+  // Validasi
+  if (!namaTim) return alert('Nama Tim wajib!');
+  if (!namaPendaftar) return alert('Nama PJ wajib!');
+  if (!nowa) return alert('Nomor WA wajib!');
+  if (!buktiTF.files.length) return alert('Upload bukti TF!');
+  if (!ktpFile.files.length) return alert('Upload KTP!');
+  
+  // Loading
   document.getElementById('loading').style.display = 'block';
   document.getElementById('btnDaftar').disabled = true;
-
+  
   try {
-    // Konversi file ke base64
+    // Convert file
     const buktiBase64 = await fileToBase64(buktiTF.files[0]);
     const ktpBase64 = await fileToBase64(ktpFile.files[0]);
-
-    // Siapkan data
-    const payload = {
-      namaTim: namaTim.value.trim(),
-      asalTim: asalTim.value.trim() || '-',
-      namaPendaftar: namaPendaftar.value.trim(),
-      nowa: nowa.value.trim(),
-      role: selectedRole,
-      email: email.value.trim() || '-',
-      buktiTF: buktiBase64,
-      buktiTFName: buktiTF.files[0].name,
-      buktiTFType: buktiTF.files[0].type,
-      ktpFile: ktpBase64,
-      ktpFileName: ktpFile.files[0].name,
-      ktpFileType: ktpFile.files[0].type
-    };
-
-    console.log('📤 Mengirim ke:', APPS_SCRIPT_URL);
     
-    // Kirim ke Apps Script
+    // Kirim data
     const response = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        namaTim, asalTim, namaPendaftar, nowa, email, role,
+        buktiTF: buktiBase64,
+        buktiTFName: buktiTF.files[0].name,
+        buktiTFType: buktiTF.files[0].type,
+        ktpFile: ktpBase64,
+        ktpFileName: ktpFile.files[0].name,
+        ktpFileType: ktpFile.files[0].type
+      })
     });
-
+    
     const result = await response.json();
-    console.log('📥 Response:', result);
     
     if (result.success) {
+      // SUKSES - Tampilkan popup
+      alert('✅ PENDAFTARAN BERHASIL!\n\nKlik OK untuk konfirmasi ke panitia.');
+      
+      // Buka WA
+      if (result.waLink) window.open(result.waLink, '_blank');
+      
       // Reset form
-      document.getElementById('formPendaftaran').reset();
-      
-      // Tampilkan popup sukses
-      showPopupSuccess(namaTim.value, namaPendaftar.value, result.waLink);
-      
+      document.getElementById('formPendaftaran')?.reset();
     } else {
-      throw new Error(result.error || 'Gagal mendaftar');
+      throw new Error(result.error || 'Gagal');
     }
-
-  } catch (error) {
-    console.error('🔴 Error:', error);
-    alert('❌ Gagal mengirim data. Silakan hubungi panitia via WA:\nwa.me/6281381191141');
     
+  } catch (error) {
+    alert('❌ Gagal. Hubungi panitia: wa.me/6281381191141');
+    console.error(error);
   } finally {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('btnDaftar').disabled = false;
   }
 }
+</script>
 
 // Fungsi menampilkan popup sukses
 function showPopupSuccess(namaTim, namaPJ, waLink) {
@@ -744,3 +710,4 @@ function showPopupSuccess(namaTim, namaPJ, waLink) {
 </body>
 
 </html>
+
